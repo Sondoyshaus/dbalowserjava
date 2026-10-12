@@ -6,7 +6,7 @@ A sleek, lightweight desktop web browser written in Java using JavaFX and styled
 
 * **Firefox-Inspired Dark UI**: Modern dark theme crafted with CSS.
 
-* **Custom Home Screen**: Quick shortcuts (Google, Gemini, GitHub, YouTube, StackOverflow) and direct search bar functionality.
+* **Custom Home Screen**: Quick shortcuts (Google, GitHub, YouTube, StackOverflow) and direct search bar functionality.
 
 * **Developer Tools Console (`</>`)**: Execute JavaScript commands directly against active pages and inspect outputs in real time.
 
@@ -38,7 +38,7 @@ Before compiling and running the project locally, ensure you have the following 
 ### 1. Clone the Repository
 
 ```
-git clone https://github.com/your-username/Dodong-Balodowser.git
+git clone https://github.com/Sondoyshaus/dbalodowserjava.git
 cd Dodong-Balodowser
 
 ```
