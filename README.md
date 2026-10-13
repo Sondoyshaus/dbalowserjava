@@ -39,7 +39,7 @@ Before compiling and running the project locally, ensure you have the following 
 
 ```
 git clone https://github.com/Sondoyshaus/dbalodowserjava.git
-cd Dodong-Balodowser
+cd dbalowserjava
 
 ```
 
@@ -74,3 +74,7 @@ run_app.bat
 ## 📄 License
 
 This project is licensed under the Apache License 2.0 — see the [LICENSE](https://github.com/Sondoyshaus/dbalowserjava/blob/main/LICENSE) file for details.
+
+## About the creator and the name
+
+Antonio Fidel Dairocas, called as Sondoyshaus, is a curious developer who want to develop apps. The name "Sondoyshaus" is originally "Sondoys haus," the name for my house in Minecraft Bedrock 1.21.40.22. Do not get similar with "sønderhaus," because I am not that one.
