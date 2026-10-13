@@ -4,6 +4,8 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
@@ -36,15 +38,15 @@ public class SimpleBrowser extends Application {
         </head>
         <body>
             <h1>Dodong Balodowser</h1>
-            <p>Your lightning-fast custom Java web browser</p>
+            <p>Your lightning-fast custom Java web browser (v0.02-alpha)</p>
             <div class="search-box">
                 <input type="text" id="searchInput" placeholder="Search Google or enter address..." autofocus>
             </div>
             <div class="shortcuts">
                 <a class="shortcut" href="https://www.google.com">Google</a>
+                <a class="shortcut" href="https://gemini.google.com">Gemini</a>
                 <a class="shortcut" href="https://www.github.com">GitHub</a>
                 <a class="shortcut" href="https://www.youtube.com">YouTube</a>
-                <a class="shortcut" href="https://stackoverflow.com">StackOverflow</a>
             </div>
             <script>
                 document.getElementById('searchInput').addEventListener('keypress', function (e) {
@@ -67,81 +69,18 @@ public class SimpleBrowser extends Application {
         </html>
     """;
 
+    private TabPane tabPane;
+    private Stage primaryStageRef;
+
     @Override
     public void start(Stage primaryStage) {
-        WebView webView = new WebView();
-        WebEngine webEngine = webView.getEngine();
+        this.primaryStageRef = primaryStage;
+        tabPane = new TabPane();
+        tabPane.getStyleClass().add("tab-pane");
 
-        // Load Home screen initially
-        loadPage(HOME_URL, webEngine);
-
-        // --- Tab Bar Component ---
-        HBox tabBar = new HBox();
-        tabBar.getStyleClass().add("tab-bar");
-
-        HBox activeTab = new HBox(8);
-        activeTab.getStyleClass().add("tab-active");
-        
-        Label tabFavicon = new Label("🌐");
-        tabFavicon.setStyle("-fx-font-size: 13px;");
-        Label tabTitle = new Label("Home");
-        tabTitle.getStyleClass().add("tab-title");
-        Button tabClose = new Button("×");
-        tabClose.getStyleClass().add("tab-close-btn");
-
-        activeTab.getChildren().addAll(tabFavicon, tabTitle, tabClose);
-        
-        Button newTabBtn = new Button("+");
-        newTabBtn.getStyleClass().add("new-tab-btn");
-        newTabBtn.setOnAction(e -> loadPage(HOME_URL, webEngine));
-
-        tabBar.getChildren().addAll(activeTab, newTabBtn);
-
-        // --- Navigation Bar Components ---
-        Button btnBack = new Button("‹");
-        Button btnForward = new Button("›");
-        Button btnReload = new Button("↻");
-        Button btnHome = new Button("⌂");
-
-        btnBack.getStyleClass().addAll("nav-btn", "nav-circle");
-        btnForward.getStyleClass().addAll("nav-btn", "nav-circle");
-        btnReload.getStyleClass().add("nav-btn");
-        btnHome.getStyleClass().add("nav-btn");
-
-        btnBack.setDisable(true);
-        btnForward.setDisable(true);
-
-        // Address Bar Container
-        HBox addressContainer = new HBox(6);
-        addressContainer.getStyleClass().add("url-container");
-        addressContainer.setAlignment(Pos.CENTER_LEFT);
-
-        Label lockIcon = new Label("🔒");
-        lockIcon.setStyle("-fx-font-size: 11px; -fx-text-fill: #a2a0a6;");
-        
-        TextField addressBar = new TextField(HOME_URL);
-        addressBar.getStyleClass().add("url-bar");
-        HBox.setHgrow(addressBar, Priority.ALWAYS);
-
-        Button btnGo = new Button("➔");
-        btnGo.getStyleClass().add("go-btn");
-
-        addressContainer.getChildren().addAll(lockIcon, addressBar, btnGo);
-
-        // Developer Tools Toggle Button
-        Button btnDevTools = new Button("</>");
-        btnDevTools.getStyleClass().add("nav-btn");
-        btnDevTools.setTooltip(new javafx.scene.control.Tooltip("Toggle Developer Tools"));
-
-        HBox navBar = new HBox(8);
-        navBar.getStyleClass().add("nav-bar");
-        navBar.setAlignment(Pos.CENTER_LEFT);
-        navBar.getChildren().addAll(btnBack, btnForward, btnReload, btnHome, addressContainer, btnDevTools);
-        HBox.setHgrow(addressContainer, Priority.ALWAYS);
-
-        // Header container
-        VBox topContainer = new VBox();
-        topContainer.getChildren().addAll(tabBar, navBar);
+        // Initialize the '+' tab button in the tab strip and the first browsing tab
+        ensurePlusTabExists();
+        createNewTab(HOME_URL);
 
         // --- Developer Tools Panel Setup ---
         VBox devToolsPanel = new VBox(5);
@@ -173,15 +112,22 @@ public class SimpleBrowser extends Application {
 
         TextField jsInput = new TextField();
         jsInput.getStyleClass().add("devtools-input");
-        jsInput.setPromptText("Run JavaScript (e.g. document.title) and press Enter...");
+        jsInput.setPromptText("Run JavaScript and press Enter...");
         
         jsInput.setOnAction(e -> {
             String script = jsInput.getText();
             if (!script.isEmpty()) {
                 consoleOutput.appendText("> " + script + "\n");
                 try {
-                    Object result = webEngine.executeScript(script);
-                    consoleOutput.appendText("  < " + (result != null ? result.toString() : "undefined") + "\n");
+                    Tab currentTab = tabPane.getSelectionModel().getSelectedItem();
+                    if (currentTab != null && !"PLUS_TAB".equals(currentTab.getId()) && currentTab.getContent() instanceof BorderPane) {
+                        BorderPane bp = (BorderPane) currentTab.getContent();
+                        if (bp.getCenter() instanceof WebView) {
+                            WebView activeWv = (WebView) bp.getCenter();
+                            Object result = activeWv.getEngine().executeScript(script);
+                            consoleOutput.appendText("  < " + (result != null ? result.toString() : "undefined") + "\n");
+                        }
+                    }
                 } catch (Exception ex) {
                     consoleOutput.appendText("  ! Error: " + ex.getMessage() + "\n");
                 }
@@ -191,22 +137,114 @@ public class SimpleBrowser extends Application {
 
         devToolsPanel.getChildren().addAll(devToolsHeader, consoleOutput, jsInput);
 
-        btnDevTools.setOnAction(e -> {
-            boolean isVisible = devToolsPanel.isVisible();
-            devToolsPanel.setVisible(!isVisible);
-            devToolsPanel.setManaged(!isVisible);
-        });
-
-        // Main Browser View layout container
-        BorderPane browserPane = new BorderPane();
-        browserPane.setTop(topContainer);
-        browserPane.setCenter(webView);
+        BorderPane mainLayout = new BorderPane();
+        mainLayout.setTop(tabPane);
 
         VBox rootContainer = new VBox();
-        VBox.setVgrow(browserPane, Priority.ALWAYS);
-        rootContainer.getChildren().addAll(browserPane, devToolsPanel);
+        VBox.setVgrow(mainLayout, Priority.ALWAYS);
+        rootContainer.getChildren().addAll(mainLayout, devToolsPanel);
 
-        // --- Navigation Actions ---
+        // Scene Setup (900x700 resolution)
+        Scene scene = new Scene(rootContainer, 900, 700);
+        scene.getStylesheets().add(getClass().getResource("firefox.css").toExternalForm());
+
+        try {
+            primaryStage.getIcons().add(new Image(getClass().getResourceAsStream("icon.png")));
+        } catch (Exception ignored) {}
+
+        primaryStage.setScene(scene);
+        primaryStage.setTitle("Dodong Balodowser v0.02-alpha");
+        primaryStage.show();
+    }
+
+    private void createNewTab(String initialUrl) {
+        WebView webView = new WebView();
+        WebEngine webEngine = webView.getEngine();
+
+        loadPage(initialUrl, webEngine);
+
+        // --- Navigation Controls ---
+        Button btnBack = new Button("‹");
+        Button btnForward = new Button("›");
+        Button btnReload = new Button("↻");
+        Button btnHome = new Button("⌂");
+
+        btnBack.getStyleClass().addAll("nav-btn", "nav-circle");
+        btnForward.getStyleClass().addAll("nav-btn", "nav-circle");
+        btnReload.getStyleClass().add("nav-btn");
+        btnHome.getStyleClass().add("nav-btn");
+
+        btnBack.setDisable(true);
+        btnForward.setDisable(true);
+
+        HBox addressContainer = new HBox(6);
+        addressContainer.getStyleClass().add("url-container");
+        addressContainer.setAlignment(Pos.CENTER_LEFT);
+
+        Label lockIcon = new Label("🔒");
+        lockIcon.setStyle("-fx-font-size: 11px; -fx-text-fill: #a2a0a6;");
+        
+        TextField addressBar = new TextField(initialUrl.equals(HOME_URL) ? "balodowser://home" : initialUrl);
+        addressBar.getStyleClass().add("url-bar");
+        HBox.setHgrow(addressBar, Priority.ALWAYS);
+
+        Button btnGo = new Button("➔");
+        btnGo.getStyleClass().add("go-btn");
+
+        addressContainer.getChildren().addAll(lockIcon, addressBar, btnGo);
+
+        Button btnDevTools = new Button("</>");
+        btnDevTools.getStyleClass().add("nav-btn");
+
+        HBox navBar = new HBox(8);
+        navBar.getStyleClass().add("nav-bar");
+        navBar.setAlignment(Pos.CENTER_LEFT);
+        navBar.getChildren().addAll(btnBack, btnForward, btnReload, btnHome, addressContainer, btnDevTools);
+        HBox.setHgrow(addressContainer, Priority.ALWAYS);
+
+        BorderPane browserPane = new BorderPane();
+        browserPane.setTop(navBar);
+        browserPane.setCenter(webView);
+
+        Tab tab = new Tab();
+        tab.setClosable(false);
+        
+        HBox tabHeaderBox = new HBox(6);
+        tabHeaderBox.setAlignment(Pos.CENTER_LEFT);
+        Label titleLbl = new Label("New Tab");
+        titleLbl.getStyleClass().add("tab-title");
+        Button closeTabBtn = new Button("×");
+        closeTabBtn.getStyleClass().add("tab-close-btn");
+        closeTabBtn.setOnAction(e -> {
+            long normalTabsCount = tabPane.getTabs().stream().filter(t -> !"PLUS_TAB".equals(t.getId())).count();
+            if (normalTabsCount > 1) {
+                tabPane.getTabs().remove(tab);
+            } else {
+                primaryStageRef.close();
+            }
+        });
+        tabHeaderBox.getChildren().addAll(titleLbl, closeTabBtn);
+        tab.setGraphic(tabHeaderBox);
+        tab.setContent(browserPane);
+
+        // Insert before the '+' tab
+        int plusIndex = -1;
+        for (int i = 0; i < tabPane.getTabs().size(); i++) {
+            if ("PLUS_TAB".equals(tabPane.getTabs().get(i).getId())) {
+                plusIndex = i;
+                break;
+            }
+        }
+
+        if (plusIndex != -1) {
+            tabPane.getTabs().add(plusIndex, tab);
+        } else {
+            tabPane.getTabs().add(tab);
+        }
+
+        tabPane.getSelectionModel().select(tab);
+
+        // --- Actions ---
         addressBar.setOnAction(event -> loadPage(addressBar.getText(), webEngine));
         btnGo.setOnAction(event -> loadPage(addressBar.getText(), webEngine));
         btnReload.setOnAction(event -> {
@@ -220,16 +258,12 @@ public class SimpleBrowser extends Application {
 
         btnBack.setOnAction(event -> {
             WebHistory history = webEngine.getHistory();
-            if (history.getCurrentIndex() > 0) {
-                history.go(-1);
-            }
+            if (history.getCurrentIndex() > 0) history.go(-1);
         });
 
         btnForward.setOnAction(event -> {
             WebHistory history = webEngine.getHistory();
-            if (history.getCurrentIndex() < history.getEntries().size() - 1) {
-                history.go(1);
-            }
+            if (history.getCurrentIndex() < history.getEntries().size() - 1) history.go(1);
         });
 
         webEngine.getHistory().currentIndexProperty().addListener((obs, oldIdx, newIdx) -> {
@@ -240,7 +274,7 @@ public class SimpleBrowser extends Application {
         });
 
         webEngine.locationProperty().addListener((obs, oldUrl, newUrl) -> {
-            if (newUrl != null && !newUrl.equals("data:text/html;charset=utf-8,...")) {
+            if (newUrl != null && !newUrl.isEmpty()) {
                 addressBar.setText(newUrl.equals(HOME_URL) ? "balodowser://home" : newUrl);
                 lockIcon.setVisible(newUrl.startsWith("https://"));
             }
@@ -251,22 +285,27 @@ public class SimpleBrowser extends Application {
             if (webEngine.getLocation() != null && webEngine.getLocation().equals(HOME_URL)) {
                 title = "Home";
             }
-            tabTitle.setText(title);
-            primaryStage.setTitle(title + " — Dodong Balodowser");
+            titleLbl.setText(title);
+            if (tab.isSelected()) {
+                primaryStageRef.setTitle(title + " — Dodong Balodowser");
+            }
         });
+    }
 
-        // --- Scene Setup (900x700 resolution) ---
-        Scene scene = new Scene(rootContainer, 900, 700);
-        scene.getStylesheets().add(getClass().getResource("firefox.css").toExternalForm());
-
-        // Optional Window Icon setup (place an icon.png in your folder if desired)
-        try {
-            primaryStage.getIcons().add(new Image(getClass().getResourceAsStream("icon.png")));
-        } catch (Exception ignored) {}
-
-        primaryStage.setScene(scene);
-        primaryStage.setTitle("Dodong Balodowser");
-        primaryStage.show();
+    private void ensurePlusTabExists() {
+        boolean hasPlus = tabPane.getTabs().stream().anyMatch(t -> "PLUS_TAB".equals(t.getId()));
+        if (!hasPlus) {
+            Tab plusTab = new Tab("+");
+            plusTab.setId("PLUS_TAB");
+            plusTab.setClosable(false);
+            
+            plusTab.setOnSelectionChanged(e -> {
+                if (plusTab.isSelected()) {
+                    createNewTab(HOME_URL);
+                }
+            });
+            tabPane.getTabs().add(plusTab);
+        }
     }
 
     private void loadPage(String url, WebEngine engine) {
